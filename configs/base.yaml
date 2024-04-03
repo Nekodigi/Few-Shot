@@ -1,0 +1,14 @@
+base_model: google/vit-base-patch16-224-in21k
+training_type: fine_tuning
+version: 
+trainer: 
+  dropout: 0.1
+  epoch: 10
+  lr: 0.01
+  swa: 0.01
+  decay: 0.01
+dataloader:
+  name: local/pets
+  shot: 
+  augmentation: []
+  batch_size: 4

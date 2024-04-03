@@ -1,0 +1,4 @@
+defaults:
+  - base
+
+version: ${base_model}=${dataloader.name}=${dataloader.shot}
