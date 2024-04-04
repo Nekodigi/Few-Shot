@@ -56,9 +56,11 @@ class MyDataset(TorchDataset):
 
     def __getitem__(self, idx):
         item = self.dataset[idx]
+        # image = self.trans(item["image"])
+        image = []  # since image size is not yet constant
         label_tensor = torch.tensor(item["label"])
         embed_tensor = torch.tensor(item["embed"])
-        return label_tensor, embed_tensor
+        return image, label_tensor, embed_tensor
 
 
 def get_dataset(cfg: Config):
@@ -68,7 +70,7 @@ def get_dataset(cfg: Config):
         new_ds_dict[key] = dataset.map(
             get_func(cfg.base_model),
             batched=True,
-            batch_size=16,
+            batch_size=2,
             with_rank=True,
             num_proc=torch.cuda.device_count(),  # torch.cuda.device_count() # , load_from_cache_file=False
         )
@@ -172,6 +174,19 @@ def get_image_key(ds: Dataset) -> str:
         if key in ds.features.keys():
             return key
     assert False, "No image key found"  # type: ignore
+
+
+def apply_image_rect_trans(ds, image_key: str, image_size: int):
+    transform = T.Compose(
+        [T.Resize(image_size), T.CenterCrop(image_size), T.ToTensor()]
+    )  # T.Lambda(maybe_convert_fn),
+
+    def trans(data):
+        data[image_key] = [transform(img) for img in data[image_key]]
+        return data
+
+    ds.set_transform(trans)
+    return ds
 
 
 # endregion

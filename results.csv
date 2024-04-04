@@ -1,2 +1,5 @@
 google/vit-base-patch16-224-in21k=local/pets=None,1.0,1.0
 google/vit-base-patch16-224-in21k=local/pets=None,1.0,1.0
+WinKawaks/vit-tiny-patch16-224=local/pets=None,1.0,1.0
+WinKawaks/vit-tiny-patch16-224=local/tongue=None,0.20000000298023224,0.20000000298023224
+google/vit-huge-patch14-224-in21k=local/tongue=None,0.25,0.25

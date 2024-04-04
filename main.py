@@ -11,35 +11,42 @@ from torch import Tensor, nn
 from torchmetrics.functional import accuracy
 
 from few_shot.config import Config
+from few_shot.confusion import save_confusion_matrix
 from few_shot.dataset import DataModule
+from few_shot.projector import Projector
 
 settrace
 
 
 class LinearProbing(L.LightningModule):
-    def __init__(
-        self, cfg: Config, input_dim: int, num_cls: int
-    ):  # , datamodule: DataModule
+    def __init__(self, cfg: Config):  # , datamodule: DataModule
         super().__init__()
         self.save_hyperparameters()
         self.model = nn.Sequential(
-            nn.Linear(input_dim, num_cls),
+            nn.Linear(datamodule.input_dim, datamodule.num_classes),
         )
         self.cfg = cfg
         self.lr = cfg.trainer.lr
-        self.num_cls = num_cls
+        self.num_cls = datamodule.num_classes
 
     def forward(self, x: Tensor) -> Tensor:
         out = self.model(x)
         return F.log_softmax(out, dim=1)
 
     def evaluate(self, batch, stage=None):
-        y, emb = batch
+        _, y, emb = batch
         # acuraccy
         logits = self(emb)
         loss = F.nll_loss(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        acc = accuracy(preds, y, "multiclass", num_classes=self.num_cls)
+        if self.cfg.training_type == "rag":
+            scores, retrieved = train_db.get_nearest_examples_batch(
+                "embed", emb.cpu().numpy(), 1
+            )
+            preds = torch.cat([torch.tensor(data["label"]) for data in retrieved])
+        else:
+            preds = torch.argmax(logits, dim=1)
+
+        acc = accuracy(preds.cpu(), y.cpu(), "multiclass", num_classes=self.num_cls)
 
         if stage:
             self.log(f"{stage}_loss", loss)
@@ -78,9 +85,20 @@ print("IMPORT FIN")
 def main(cfg):
     cfg = cast(Config, cfg)
 
+    global datamodule
     datamodule = DataModule(cfg)
     datamodule.setup()
-    model = LinearProbing(cfg, datamodule.input_dim, datamodule.num_classes)
+
+    with Projector(
+        cfg, datamodule, "projector"  # /{cfg.dataloader.name}/{cfg.base_model}
+    ) as projector:
+        projector.project_random_n(50)
+
+    global train_db
+    train_db = datamodule.ds_dict["train"]
+    train_db.add_faiss_index("embed")
+
+    model = LinearProbing(cfg)
 
     trainer = L.Trainer(
         max_epochs=cfg.trainer.epoch,
@@ -93,7 +111,8 @@ def main(cfg):
         # profiler="simple",
     )
 
-    trainer.fit(model, datamodule)  # type: ignore
+    if cfg.training_type != "rag":
+        trainer.fit(model, datamodule)  # type: ignore
     trainer.test(model, datamodule)  # type: ignore
 
     if hasattr(model, "train_acc") and hasattr(model, "test_acc"):
@@ -110,6 +129,8 @@ def main(cfg):
             writer = csv.writer(f)
             writer.writerows(results)
             f.truncate()
+
+    save_confusion_matrix(cfg, model, datamodule, "confusion_matrix.png")
 
 
 if __name__ == "__main__":
