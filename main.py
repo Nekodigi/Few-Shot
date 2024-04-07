@@ -24,6 +24,7 @@ class LinearProbing(L.LightningModule):
         self.save_hyperparameters()
         self.model = nn.Sequential(
             nn.Linear(datamodule.input_dim, datamodule.num_classes),
+            nn.Dropout(cfg.trainer.dropout),
         )
         self.cfg = cfg
         self.lr = cfg.trainer.lr
@@ -92,7 +93,7 @@ def main(cfg):
     with Projector(
         cfg, datamodule, "projector"  # /{cfg.dataloader.name}/{cfg.base_model}
     ) as projector:
-        projector.project_random_n(50)
+        projector.project_random_n(25)
 
     global train_db
     train_db = datamodule.ds_dict["train"]

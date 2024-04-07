@@ -1,14 +1,14 @@
 base_model: google/vit-base-patch16-224-in21k
-training_type: rag
+training_type: liner_probing
 version: 
 trainer: 
   dropout: 0.1
-  epoch: 10
+  epoch: 100
   lr: 0.01
   swa: 0.01
-  decay: 0.01
+  decay: 0.1
 dataloader:
-  name: cifar10
+  name: local/tongue_mask
   shot: 10
   augmentation: []
   batch_size: 4

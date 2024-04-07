@@ -4,6 +4,7 @@ from os import cpu_count
 from typing import cast
 
 import lightning as L
+import numpy as np
 import torch
 from datasets import (
     Dataset,
@@ -131,6 +132,18 @@ def embed(batch, rank: int, model: ViTModel, processor: ViTImageProcessor):
     model.to(device)  # type: ignore
 
     def v_embed(x):
+        # convert to rgb if not. x is PIL image
+        if x.mode != "RGB":
+            x = x.convert("RGB")
+        masked_array = np.array(x)
+        non_black_pixels = np.any(masked_array != 0, axis=-1)
+        non_black_coordinates = np.argwhere(non_black_pixels)
+        (top, left), (bottom, right) = (
+            non_black_coordinates.min(0),
+            non_black_coordinates.max(0) + 1,
+        )
+        x = x.crop((left, top, right, bottom))
+
         inputs = processor(images=x, return_tensors="pt").to(device)
         emb = model(**inputs).last_hidden_state[:, 0][0]
         return emb
