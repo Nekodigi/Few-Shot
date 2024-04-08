@@ -9,11 +9,14 @@ import torch.nn.functional as F
 from lightning.pytorch.callbacks import LearningRateMonitor, StochasticWeightAveraging
 from torch import Tensor, nn
 from torchmetrics.functional import accuracy
-
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
 from few_shot.config import Config
 from few_shot.confusion import save_confusion_matrix
 from few_shot.dataset import DataModule
 from few_shot.projector import Projector
+import timm
+import torchvision.transforms as T
 
 settrace
 
@@ -24,20 +27,31 @@ class LinearProbing(L.LightningModule):
         self.save_hyperparameters()
         self.model = nn.Sequential(
             nn.Linear(datamodule.input_dim, datamodule.num_classes),
-            nn.Dropout(cfg.trainer.dropout),
+            #nn.Dropout(cfg.trainer.dropout),
         )
         self.cfg = cfg
         self.lr = cfg.trainer.lr
         self.num_cls = datamodule.num_classes
+        model = timm.create_model(cfg.base_model, pretrained=True)
+        model.eval()
+        self.trans = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
+        self.base_model = model.to(self.device)
 
     def forward(self, x: Tensor) -> Tensor:
-        out = self.model(x)
+        x = torch.stack([self.trans(T.ToPILImage()(img)) for img in x]).to(self.device) # type: ignore
+        emb = self.base_model.forward_features(x)
+        emb = emb[:, 0]
+        
+        out = self.model(emb)
         return F.log_softmax(out, dim=1)
 
     def evaluate(self, batch, stage=None):
-        _, y, emb = batch
+        imgs, y, emb = batch
+        # to pil
+        
+        
         # acuraccy
-        logits = self(emb)
+        logits = self(imgs)
         loss = F.nll_loss(logits, y)
         if self.cfg.training_type == "rag":
             scores, retrieved = train_db.get_nearest_examples_batch(
@@ -109,6 +123,7 @@ def main(cfg):
             LearningRateMonitor(logging_interval="step"),  # type: ignore
             # StochasticWeightAveraging(swa_lrs=1e-2),
         ],
+        log_every_n_steps=1,
         # profiler="simple",
     )
 

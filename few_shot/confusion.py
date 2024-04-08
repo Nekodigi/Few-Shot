@@ -16,10 +16,10 @@ def class_wise_acc(cfg, model, datamodule: DataModule, device):
     model = model.to(device)
     model.eval()
     with torch.no_grad():
-        for _, labels, embed in datamodule.test_dataloader():
+        for imgs, labels, embed in datamodule.test_dataloader():
             embed = embed.to(device)
             labels = labels.to(device)
-            logits = model(embed)
+            logits = model(imgs)
             if cfg.training_type == "rag":
                 scores, retrieved = train_db.get_nearest_examples_batch(
                     "embed", embed.cpu().numpy(), 1

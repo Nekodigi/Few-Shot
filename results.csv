@@ -5,3 +5,12 @@ WinKawaks/vit-tiny-patch16-224=local/tongue=None,0.20000000298023224,0.200000002
 google/vit-huge-patch14-224-in21k=local/tongue=None,0.25,0.25
 google/vit-base-patch16-224-in21k=local/tongue_mask=10,0.2876712381839752,0.2876712381839752
 google/vit-base-patch16-224-in21k=local/tongue_mask=10,0.30136987566947937,0.30136987566947937
+timm/vit_base_patch16_224.augreg_in21k=local/tongue_mask=None,0.190476194024086,0.190476194024086
+timm/vit_base_patch16_224.augreg_in21k=local/tongue_mask=None,0.190476194024086,0.190476194024086
+timm/vit_base_patch16_224.augreg_in21k=local/tongue_mask=10,0.3333333432674408,0.3333333432674408
+timm/vit_base_patch16_224.augreg_in21k=local/tongue_mask=10,0.2857142984867096,0.2857142984867096
+timm/vit_base_patch16_224.augreg_in21k=local/tongue_mask=10,0.3333333432674408,0.3333333432674408
+timm/vit_base_patch16_224.augreg_in21k=local/tongue_mask=10,0.4285714328289032,0.4285714328289032
+timm/vit_base_patch16_224.augreg2_in21k_ft_in1k=local/tongue_mask=10,0.3333333432674408,0.3333333432674408
+timm/vit_base_patch16_224.augreg2_in21k_ft_in1k=local/tongue_mask=10,0.3333333432674408,0.3333333432674408
+timm/vit_base_patch16_224.augreg2_in21k_ft_in1k=local/tongue_mask=None,0.35555556416511536,0.35555556416511536

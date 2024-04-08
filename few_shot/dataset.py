@@ -5,6 +5,7 @@ from typing import cast
 
 import lightning as L
 import numpy as np
+import timm
 import torch
 from datasets import (
     Dataset,
@@ -17,7 +18,8 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset as TorchDataset
 from torchvision import transforms as T
 from transformers import AutoProcessor, CLIPModel, ViTImageProcessor, ViTModel
-
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
 from .config import Config
 
 DATASETS_PATH = "/app/.datasets"
@@ -50,18 +52,62 @@ class DataModule(L.LightningDataModule):
 class MyDataset(TorchDataset):
     def __init__(self, dataset: Dataset, test=False):
         self.dataset = dataset
-        self.trans = T.Compose([T.ToTensor()])
+        # image should be same size
+        if test:
+            self.trans = T.Compose(
+                [
+                    T.Resize(224),
+                    T.CenterCrop(224),
+                    T.ToTensor(),
+                ]
+            )
+        else:
+            self.trans = T.Compose(
+                [
+                    #T.Resize(224),
+                    #T.CenterCrop(224),
+                    
+                    # T.RandomResizedCrop(224),  # Random crop and resize
+                    # T.RandomHorizontalFlip(),  # Random horizontal flip
+                    # T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Color jittering
+                    # T.RandomRotation(15),  # Random rotation within +/- 15 degrees
+                    # T.GaussianBlur(kernel_size=3),  # Gaussian blur
+                    
+                    T.RandomResizedCrop(224),  # Random crop and resize
+                    T.RandomHorizontalFlip(),  # Random horizontal flip
+                    T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Color jittering
+                    T.RandomRotation(30),  # Increased rotation range
+                    T.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.8, 1.2), shear=10),  # Random affine transformation
+                    T.RandomVerticalFlip(),  # Random vertical flip
+                    T.GaussianBlur(kernel_size=5),  # Gaussian blur with larger kernel size
+                    
+                    T.ToTensor(),
+                    
+
+                ]
+            )
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, idx):
         item = self.dataset[idx]
-        # image = self.trans(item["image"])
-        image = []  # since image size is not yet constant
+        #image = []  # since image size is not yet constant
+        x = item["image"]
+        if x.mode != "RGB":
+            x = x.convert("RGB")
+        # masked_array = np.array(x)
+        # non_black_pixels = np.any(masked_array != 0, axis=-1)
+        # non_black_coordinates = np.argwhere(non_black_pixels)
+        # (top, left), (bottom, right) = (
+        #     non_black_coordinates.min(0),
+        #     non_black_coordinates.max(0) + 1,
+        # )
+        # x = x.crop((left, top, right, bottom))
+        
         label_tensor = torch.tensor(item["label"])
         embed_tensor = torch.tensor(item["embed"])
-        return image, label_tensor, embed_tensor
+        return self.trans(x), label_tensor, embed_tensor
 
 
 def get_dataset(cfg: Config):
@@ -127,7 +173,7 @@ def load_raw_dataset(cfg: Config):
         return ds_dict
 
 
-def embed(batch, rank: int, model: ViTModel, processor: ViTImageProcessor):
+def embed(batch, rank: int, model, transform: T.Compose):
     device = f"cuda:{(rank or 0)}"
     model.to(device)  # type: ignore
 
@@ -144,8 +190,13 @@ def embed(batch, rank: int, model: ViTModel, processor: ViTImageProcessor):
         )
         x = x.crop((left, top, right, bottom))
 
-        inputs = processor(images=x, return_tensors="pt").to(device)
-        emb = model(**inputs).last_hidden_state[:, 0][0]
+        #inputs = processor(images=x, return_tensors="pt").to(device)
+        inputs = transform(x).unsqueeze(0).to(device)
+        emb = model.forward_features(inputs)
+        print(emb.shape)
+        emb = emb[:, 0][0]
+        print(emb.shape)
+        #emb = model(**inputs).last_hidden_state[:, 0][0]
         return emb
 
     batch["embed"] = [v_embed(x) for x in batch["image"]]
@@ -153,9 +204,12 @@ def embed(batch, rank: int, model: ViTModel, processor: ViTImageProcessor):
 
 
 def get_func(name: str) -> partial:
-    processor = ViTImageProcessor.from_pretrained(name)
-    model = ViTModel.from_pretrained(name)
-    return partial(embed, model=model, processor=processor)  # type: ignore
+    #processor = ViTImageProcessor.from_pretrained(name)
+    #model = ViTModel.from_pretrained(name)
+    model = timm.create_model(name, pretrained=True)
+    model.eval()
+    transform = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
+    return partial(embed, model=model, transform=transform)  # type: ignore
 
 
 WORKER_DIV = 1
