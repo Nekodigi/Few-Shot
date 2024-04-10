@@ -4,3 +4,6 @@ timm/vit_base_patch16_224.augreg2_in21k_ft_in1k=local/tongue/size/single1=None,0
 timm/vit_base_patch16_224.augreg2_in21k_ft_in1k=local/tongue/size/single2=None,0,0.3333333432674408
 timm/vit_base_patch16_224.augreg2_in21k_ft_in1k=local/pets=None
 single0=None,0,0.20000000298023224
+single1=None,0,0.46666666865348816
+single2=None,0,0.3333333432674408
+single3=None,0,0.4000000059604645

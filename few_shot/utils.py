@@ -18,7 +18,7 @@ def log_model_acc(cfg: Config, model: L.LightningModule, minimal=False):
         writer = csv.writer(f)
         v = cfg.version
         if minimal:
-            v = v.split("/")[-1]
+            v = f"{v.split('/')[-2]}/{v.split('/')[-1]}"
         writer.writerow([v, str(val_acc), str(test_acc)])
 
 
