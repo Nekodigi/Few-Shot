@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import seaborn as sns
 import torch
@@ -9,7 +11,7 @@ from few_shot.config import Config
 from few_shot.dataset import DataModule
 
 
-def class_wise_acc(cfg, model, datamodule: DataModule, device):
+def class_wise_acc(cfg, model: LightningModule, datamodule: DataModule, device):
     train_db = datamodule.ds_dict["train"]
     train_db.add_faiss_index("embed")
     class_acc_list, y_preds, true_label = [], [], []
@@ -19,14 +21,13 @@ def class_wise_acc(cfg, model, datamodule: DataModule, device):
         for imgs, labels, embed in datamodule.test_dataloader():
             embed = embed.to(device)
             labels = labels.to(device)
-            logits = model(imgs)
+
             if cfg.training_type == "rag":
-                scores, retrieved = train_db.get_nearest_examples_batch(
-                    "embed", embed.cpu().numpy(), 1
-                )
-                preds = torch.cat([torch.tensor(data["label"]) for data in retrieved])
+                preds = model(embed)
             else:
+                logits = model(imgs)
                 preds = torch.argmax(logits, dim=1)
+
             y_preds.extend(preds.cpu().numpy())
             true_label.extend(labels.cpu().numpy())
             # print(preds[:4], labels[:4])
@@ -47,9 +48,7 @@ def class_wise_acc(cfg, model, datamodule: DataModule, device):
     )
 
 
-def save_confusion_matrix(
-    cfg: Config, model: LightningModule, datamodule: DataModule, file_name: str
-):
+def log_confusion_matrix(cfg: Config, model: LightningModule, datamodule: DataModule):
     acc, pred, label, cm = class_wise_acc(cfg, model, datamodule, "cuda:0")
     # visualize cm
     plt.figure(figsize=(10, 10))
@@ -66,5 +65,11 @@ def save_confusion_matrix(
     plt.ylabel("True Labels")
     plt.title("Confusion Matrix")
     # save as img
-    plt.savefig(file_name)
+    os.makedirs(
+        f"outputs/{cfg.dataloader.name.replace('/', '_')}/{cfg.base_model.replace('/', '_')}",
+        exist_ok=True,
+    )
+    plt.savefig(
+        f"outputs/{cfg.dataloader.name.replace('/', '_')}/{cfg.base_model.replace('/', '_')}/confusion_matrix.png"
+    )
     plt.show()

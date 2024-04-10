@@ -12,7 +12,9 @@ class Projector:
         self.save_dir = save_dir
 
     def __enter__(self):
-        self.writer = SummaryWriter(self.save_dir)
+        self.writer = SummaryWriter(
+            f"{self.save_dir}/{self.cfg.dataloader.name.replace('/', '_')}"
+        )
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -36,6 +38,6 @@ class Projector:
             embed,
             metadata=label,
             label_img=images,
-            global_step=f"{self.cfg.dataloader.name.replace('/', '_')}",
-            tag=f"{self.cfg.base_model}",
+            global_step=f"{self.cfg.base_model.replace('/', '_')}",  # f"{self.cfg.dataloader.name.replace('/', '_')}",
+            # tag=,
         )

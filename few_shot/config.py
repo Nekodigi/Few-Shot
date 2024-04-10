@@ -9,7 +9,7 @@ class Trainer:
     epoch: int
 
     lr: float
-    swa: float | None
+    swa: float
     decay: float
 
 

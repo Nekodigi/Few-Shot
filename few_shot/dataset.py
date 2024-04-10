@@ -7,19 +7,13 @@ import lightning as L
 import numpy as np
 import timm
 import torch
-from datasets import (
-    Dataset,
-    DatasetDict,
-    concatenate_datasets,
-    load_dataset,
-    load_from_disk,
-)
+from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset as TorchDataset
 from torchvision import transforms as T
-from transformers import AutoProcessor, CLIPModel, ViTImageProcessor, ViTModel
-from timm.data import resolve_data_config
-from timm.data.transforms_factory import create_transform
+
 from .config import Config
 
 DATASETS_PATH = "/app/.datasets"
@@ -64,26 +58,27 @@ class MyDataset(TorchDataset):
         else:
             self.trans = T.Compose(
                 [
-                    #T.Resize(224),
-                    #T.CenterCrop(224),
-                    
+                    # T.Resize(224),
+                    # T.CenterCrop(224),
                     # T.RandomResizedCrop(224),  # Random crop and resize
                     # T.RandomHorizontalFlip(),  # Random horizontal flip
                     # T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Color jittering
                     # T.RandomRotation(15),  # Random rotation within +/- 15 degrees
                     # T.GaussianBlur(kernel_size=3),  # Gaussian blur
-                    
                     T.RandomResizedCrop(224),  # Random crop and resize
                     T.RandomHorizontalFlip(),  # Random horizontal flip
-                    T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Color jittering
+                    T.ColorJitter(
+                        brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+                    ),  # Color jittering
                     T.RandomRotation(30),  # Increased rotation range
-                    T.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.8, 1.2), shear=10),  # Random affine transformation
+                    T.RandomAffine(
+                        degrees=0, translate=(0.1, 0.1), scale=(0.8, 1.2), shear=10
+                    ),  # Random affine transformation
                     T.RandomVerticalFlip(),  # Random vertical flip
-                    T.GaussianBlur(kernel_size=5),  # Gaussian blur with larger kernel size
-                    
+                    T.GaussianBlur(
+                        kernel_size=5
+                    ),  # Gaussian blur with larger kernel size
                     T.ToTensor(),
-                    
-
                 ]
             )
 
@@ -92,7 +87,6 @@ class MyDataset(TorchDataset):
 
     def __getitem__(self, idx):
         item = self.dataset[idx]
-        #image = []  # since image size is not yet constant
         x = item["image"]
         if x.mode != "RGB":
             x = x.convert("RGB")
@@ -104,7 +98,7 @@ class MyDataset(TorchDataset):
         #     non_black_coordinates.max(0) + 1,
         # )
         # x = x.crop((left, top, right, bottom))
-        
+
         label_tensor = torch.tensor(item["label"])
         embed_tensor = torch.tensor(item["embed"])
         return self.trans(x), label_tensor, embed_tensor
@@ -178,7 +172,6 @@ def embed(batch, rank: int, model, transform: T.Compose):
     model.to(device)  # type: ignore
 
     def v_embed(x):
-        # convert to rgb if not. x is PIL image
         if x.mode != "RGB":
             x = x.convert("RGB")
         masked_array = np.array(x)
@@ -190,13 +183,12 @@ def embed(batch, rank: int, model, transform: T.Compose):
         )
         x = x.crop((left, top, right, bottom))
 
-        #inputs = processor(images=x, return_tensors="pt").to(device)
+        # inputs = processor(images=x, return_tensors="pt").to(device)
         inputs = transform(x).unsqueeze(0).to(device)
         emb = model.forward_features(inputs)
-        print(emb.shape)
+        # print(emb.shape)
         emb = emb[:, 0][0]
-        print(emb.shape)
-        #emb = model(**inputs).last_hidden_state[:, 0][0]
+        # print(emb.shape)
         return emb
 
     batch["embed"] = [v_embed(x) for x in batch["image"]]
@@ -204,11 +196,11 @@ def embed(batch, rank: int, model, transform: T.Compose):
 
 
 def get_func(name: str) -> partial:
-    #processor = ViTImageProcessor.from_pretrained(name)
-    #model = ViTModel.from_pretrained(name)
     model = timm.create_model(name, pretrained=True)
     model.eval()
-    transform = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
+    transform = create_transform(
+        **resolve_data_config(model.pretrained_cfg, model=model)
+    )
     return partial(embed, model=model, transform=transform)  # type: ignore
 
 
@@ -246,7 +238,7 @@ def get_image_key(ds: Dataset) -> str:
 def apply_image_rect_trans(ds, image_key: str, image_size: int):
     transform = T.Compose(
         [T.Resize(image_size), T.CenterCrop(image_size), T.ToTensor()]
-    )  # T.Lambda(maybe_convert_fn),
+    )
 
     def trans(data):
         data[image_key] = [transform(img) for img in data[image_key]]
